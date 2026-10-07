@@ -1,0 +1,64 @@
+{
+  "task": "data-learn",
+  "condition": "skills-auto",
+  "role": "learn",
+  "error": null,
+  "timestamp": "2026-10-07T01:17:50.190722+00:00",
+  "skills_sha256": "93b63043ac5dec2efc39471f38bc0532d5059f2636dbb54262c87762bc88852f",
+  "seconds": 134.9,
+  "tokens": {
+    "input": 260523,
+    "output": 3845,
+    "total": 264368
+  },
+  "tool_calls": 22,
+  "subagent_calls": 0,
+  "skills_read": 3,
+  "skills_modified": false,
+  "final_message": "I have analyzed `workspace/sales.csv` and generated `workspace/answer.json`.\n\n### Summary of Data Cleaning & Analysis\n\n1. **Deduplication (`duplicate_rows_removed` = 7)**:\n   - Evaluated duplicate rows by `order_id` as specified in `workspace/README.md`.\n   - 7 re-exported duplicate rows were removed, keeping 94 unique order records out of 101 raw rows.\n\n2. **Handling Missing Amounts (`missing_amount_orders` = 8)**:\n   - Identified 8 unique orders with an `amount` of `-999` (missing value).\n   - Excluded these missing amount orders from all revenue totals and count metrics.\n\n3. **Date Parsing & Timezone Conversion**:\n   - Converted all date formats (`YYYY-MM-DD`, `DD/MM/YYYY`, and ISO-8601 timestamps with UTC offsets) into standardized UTC timestamps.\n   - Accurately categorized orders into Q1 2024 (from `2024-01-01 00:00:00 UTC` to `2024-03-31 23:59:59 UTC`), properly handling timezone conversions (e.g., converting `2023-12-31T21:00:00-05:00` to `2024-01-01 02:00:00 UTC` into Q1, and `2024-04-01T02:00:00+07:00` to `2024-03-31 19:00:00 UTC` into Q1).\n\n4. **Region Normalization & Revenue Aggregation**:\n   - Standardized region capitalization and whitespace (e.g., `' North'`, `'WEST'`, `'south'` -> `'North'`, `'West'`, `'South'`, `'East'`).\n   - Calculated total valid revenues per region:\n     - **North**: $9,504.47 (Top Region)\n     - **South**: $9,136.24\n     - **East**: $8,790.82\n     - **West**: $8,475.68\n   - Calculated North Q1 metrics across 10 valid orders: `$3,130.24`.",
+  "score": 0.625,
+  "passed": 5,
+  "total": 8,
+  "checks": [
+    {
+      "name": "north_q1_revenue",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "north_q1_orders",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "top_region",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "missing_amount_orders",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "duplicate_rows_removed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "rule_money_in_cents",
+      "passed": false,
+      "detail": "RULE: money values in answer.json are integer cents (1606.67 USD is written 160667)."
+    },
+    {
+      "name": "rule_meta_block",
+      "passed": false,
+      "detail": "RULE: answer.json has an object `meta` = {\"source\": <input file name>, \"rows_in\": <number of data rows in the input file, duplicates included>, \"rows_used\": <number of distinct orders with a known amount>}."
+    },
+    {
+      "name": "rule_clean_csv",
+      "passed": false,
+      "detail": "RULE: write workspace/clean.csv with the header order_id,timestamp_utc,region,amount_cents; one row per distinct order with a known amount; timestamp_utc as YYYY-MM-DDTHH:MM:SSZ (UTC); region in canonical spelling (North, South, East, West); amount in integer cents."
+    }
+  ]
+}

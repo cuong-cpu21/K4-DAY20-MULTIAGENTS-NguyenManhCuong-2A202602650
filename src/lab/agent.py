@@ -60,21 +60,36 @@ class PosixLocalShellBackend(LocalShellBackend):
                 raise ValueError(f"timeout must be positive, got {effective_timeout}")
 
             try:
-                result = subprocess.run(
+                proc = subprocess.Popen(
                     [sh_path, "-c", command],
-                    check=False,
-                    capture_output=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                     stdin=subprocess.DEVNULL,
-                    text=True,
-                    timeout=effective_timeout,
-                    env=self._env,
                     cwd=str(self.cwd),
+                    env=self._env,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
                 )
+                try:
+                    stdout, stderr = proc.communicate(timeout=effective_timeout)
+                except subprocess.TimeoutExpired:
+                    if os.name == "nt":
+                        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+                    else:
+                        proc.kill()
+                    stdout, stderr = proc.communicate()
+                    return ExecuteResponse(
+                        output=f"Error: Command timed out after {effective_timeout} seconds.",
+                        exit_code=124,
+                        truncated=False,
+                    )
+
                 output_parts = []
-                if result.stdout:
-                    output_parts.append(result.stdout)
-                if result.stderr:
-                    stderr_lines = result.stderr.strip().split("\n")
+                if stdout:
+                    output_parts.append(stdout)
+                if stderr:
+                    stderr_lines = stderr.strip().split("\n")
                     output_parts.extend(f"[stderr] {line}" for line in stderr_lines)
 
                 output = "\n".join(output_parts) if output_parts else "<no output>"
@@ -83,19 +98,13 @@ class PosixLocalShellBackend(LocalShellBackend):
                     output = output[: self._max_output_bytes] + f"\n\n... Output truncated at {self._max_output_bytes} bytes."
                     truncated = True
 
-                if result.returncode != 0:
-                    output = f"{output.rstrip()}\n\nExit code: {result.returncode}"
+                if proc.returncode != 0:
+                    output = f"{output.rstrip()}\n\nExit code: {proc.returncode}"
 
                 return ExecuteResponse(
                     output=output,
-                    exit_code=result.returncode,
+                    exit_code=proc.returncode,
                     truncated=truncated,
-                )
-            except subprocess.TimeoutExpired:
-                return ExecuteResponse(
-                    output=f"Error: Command timed out after {effective_timeout} seconds.",
-                    exit_code=124,
-                    truncated=False,
                 )
             except Exception as e:
                 return ExecuteResponse(

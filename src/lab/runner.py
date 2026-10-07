@@ -104,6 +104,7 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
         t0 = time.perf_counter()
         messages = []
         final = ""
+        seen_count = 0
         try:
             for chunk in agent.stream(
                 {"messages": [{"role": "user", "content": task.instruction}]},
@@ -111,11 +112,26 @@ def run_task(task_id: str, condition: str, results_dir="results", model=None, re
                 stream_mode="values",
             ):
                 if isinstance(chunk, dict) and "messages" in chunk:
-                    messages = chunk["messages"]
+                    curr_messages = chunk["messages"]
+                    for m in curr_messages[seen_count:]:
+                        if isinstance(m, AIMessage):
+                            if m.content:
+                                preview = m.content.strip().replace("\n", " ")[:100]
+                                print(f"[{condition}/{task_id}] 🤖 Assistant: {preview}", flush=True)
+                            for tc in getattr(m, "tool_calls", []):
+                                t_name = tc.get("name", "tool")
+                                args_repr = ", ".join(f"{k}={repr(v)[:40]}" for k, v in tc.get("args", {}).items())
+                                print(f"[{condition}/{task_id}] ⚙️  Call: {t_name}({args_repr})", flush=True)
+                        elif isinstance(m, ToolMessage):
+                            res_preview = str(m.content).strip().replace("\n", " ")[:100]
+                            print(f"[{condition}/{task_id}] 📥 Output ({m.name or 'tool'}): {res_preview}", flush=True)
+                    seen_count = len(curr_messages)
+                    messages = curr_messages
             if messages:
                 final = getattr(messages[-1], "content", "")
         except Exception as exc:
             record["error"] = f"{type(exc).__name__}: {exc}"
+            print(f"[{condition}/{task_id}] ⚠️  Error: {type(exc).__name__}: {exc}", flush=True)
             if messages:
                 final = getattr(messages[-1], "content", "")
 
